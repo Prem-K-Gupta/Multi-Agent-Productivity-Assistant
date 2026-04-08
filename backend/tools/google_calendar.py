@@ -5,7 +5,8 @@ Google Calendar MCP Tool - Real integration with Google Calendar API.
 import logging
 from datetime import datetime, timedelta
 from tools.mcp_tools import MCPTool
-from google_auth import get_service, is_google_authenticated
+from google_auth import get_service_for_user
+from database.alloydb import get_google_token
 
 logger = logging.getLogger(__name__)
 
@@ -21,35 +22,38 @@ class GoogleCalendarTool(MCPTool):
     def description(self) -> str:
         return "Google Calendar - create, list, and manage real calendar events."
 
-    def _get_service(self):
-        return get_service("calendar", "v3")
+    def _get_service(self, token_json: str):
+        return get_service_for_user("calendar", "v3", token_json)
 
     def execute(self, action: str, params: dict) -> dict:
-        if not is_google_authenticated():
-            return self._error("Google not authenticated. Run /api/auth/google first.")
+        user_id = params.get("user_id", "default_user")
+        token_row = get_google_token(user_id)
+        if not token_row:
+            return self._error("Google not authenticated. Sign in via the Google login button first.")
+
+        token_json = token_row["token_json"]
 
         try:
             if action == "create":
-                return self._create_event(params)
+                return self._create_event(token_json, params)
             elif action == "list":
-                return self._list_events(params)
+                return self._list_events(token_json, params)
             elif action == "delete":
-                return self._delete_event(params)
+                return self._delete_event(token_json, params)
             else:
                 return self._error(f"Unknown action: {action}")
         except Exception as e:
             logger.exception("Google Calendar error")
             return self._error(str(e))
 
-    def _create_event(self, params: dict) -> dict:
-        service = self._get_service()
+    def _create_event(self, token_json: str, params: dict) -> dict:
+        service = self._get_service(token_json)
         title = params.get("title", "Untitled Event")
         start_time = params.get("start_time", "")
         end_time = params.get("end_time", "")
         location = params.get("location", "")
         description = params.get("description", "")
 
-        # Parse start/end times - support various formats
         start_dt, end_dt = self._parse_times(start_time, end_time)
 
         event_body = {
@@ -72,8 +76,8 @@ class GoogleCalendarTool(MCPTool):
             },
         )
 
-    def _list_events(self, params: dict) -> dict:
-        service = self._get_service()
+    def _list_events(self, token_json: str, params: dict) -> dict:
+        service = self._get_service(token_json)
         max_results = params.get("max_results", 10)
 
         now = datetime.utcnow().isoformat() + "Z"
@@ -100,8 +104,8 @@ class GoogleCalendarTool(MCPTool):
             })
         return self._success(f"{len(event_list)} upcoming event(s) from Google Calendar.", data={"events": event_list})
 
-    def _delete_event(self, params: dict) -> dict:
-        service = self._get_service()
+    def _delete_event(self, token_json: str, params: dict) -> dict:
+        service = self._get_service(token_json)
         event_id = params.get("id")
         if not event_id:
             return self._error("Missing event ID.")
@@ -112,13 +116,10 @@ class GoogleCalendarTool(MCPTool):
         """Best-effort parsing of time strings into datetime objects."""
         now = datetime.utcnow()
 
-        # Try to parse start time
         start_dt = self._try_parse(start_str, now)
         if start_dt is None:
-            # Default to next hour
             start_dt = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
 
-        # Parse end time
         if end_str:
             end_dt = self._try_parse(end_str, now)
             if end_dt is None:
@@ -148,7 +149,6 @@ class GoogleCalendarTool(MCPTool):
             except ValueError:
                 continue
 
-        # Try simple time like "2pm", "14:00"
         import re
         time_match = re.match(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", time_str.strip(), re.IGNORECASE)
         if time_match:

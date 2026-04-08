@@ -8,5 +8,8 @@ backend/*.pyc
 backend/.env
 backend/database/real_alloy_db.sqlite
 backend/token.json
+client_secret_*.json
+venv/
+.git/
 .env
 *.log

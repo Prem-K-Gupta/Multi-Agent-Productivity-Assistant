@@ -49,9 +49,14 @@ class OrchestratorAgent:
     def process_request(self, user_prompt: str, user_id: str) -> dict:
         """Parse user intent (Gemini or regex) and delegate to appropriate sub-agent."""
         try:
-            # Parse intent
+            # Parse intent: try Gemini first, fall back to regex
             if self.gemini_enabled:
                 intent = parse_intent(user_prompt)
+                # If Gemini returned "general" but regex finds a specific match, prefer regex
+                if intent.get("agent") == "general":
+                    regex_intent = self._regex_parse_intent(user_prompt)
+                    if regex_intent.get("agent") != "general":
+                        intent = regex_intent
             else:
                 intent = self._regex_parse_intent(user_prompt)
 

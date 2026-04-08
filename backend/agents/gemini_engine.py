@@ -123,7 +123,7 @@ def generate_response(action: str, agent: str, data: dict, user_message: str) ->
             user_message=user_message,
         )
         response = client.models.generate_content(
-            model="gemini-3.1-pro",
+            model="gemini-2.5-flash",
             contents=prompt,
             config={
                 "temperature": 0.7,
@@ -149,7 +149,7 @@ def chat_response(user_message: str, context: str = "") -> str:
         prompt += f"User: {user_message}\nNexus:"
 
         response = client.models.generate_content(
-            model="gemini-3.1-pro",
+            model="gemini-2.5-flash",
             contents=prompt,
             config={
                 "temperature": 0.7,

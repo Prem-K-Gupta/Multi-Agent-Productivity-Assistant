@@ -140,22 +140,19 @@ MCP_TOOLS = {
     "notes": NotesMCPTool(),
 }
 
-# Register Google tools if credentials are configured
+# Always register Google tools — they handle per-user auth internally
+# (each tool checks the user's token in the database at execute time)
 try:
-    from google_auth import is_google_configured
-    if is_google_configured():
-        from tools.google_calendar import GoogleCalendarTool
-        from tools.google_tasks import GoogleTasksTool
-        from tools.gmail_tool import GmailTool
-        from tools.google_drive import GoogleDriveTool
+    from tools.google_calendar import GoogleCalendarTool
+    from tools.google_tasks import GoogleTasksTool
+    from tools.gmail_tool import GmailTool
+    from tools.google_drive import GoogleDriveTool
 
-        MCP_TOOLS["google_calendar"] = GoogleCalendarTool()
-        MCP_TOOLS["google_tasks"] = GoogleTasksTool()
-        MCP_TOOLS["gmail"] = GmailTool()
-        MCP_TOOLS["google_drive"] = GoogleDriveTool()
-        logger.info("Google MCP tools registered (credentials.json found)")
-    else:
-        logger.info("Google credentials not found - Google tools disabled. Place credentials.json in backend/")
+    MCP_TOOLS["google_calendar"] = GoogleCalendarTool()
+    MCP_TOOLS["google_tasks"] = GoogleTasksTool()
+    MCP_TOOLS["gmail"] = GmailTool()
+    MCP_TOOLS["google_drive"] = GoogleDriveTool()
+    logger.info("Google MCP tools registered (per-user auth at execute time)")
 except Exception as e:
     logger.warning(f"Failed to register Google tools: {e}")
 
@@ -178,5 +175,14 @@ def check_mcp_health() -> bool:
 
 
 def google_tools_available() -> bool:
-    """Check if any Google tools are registered."""
+    """Check if Google tools are registered."""
     return any(name.startswith("google") or name == "gmail" for name in MCP_TOOLS)
+
+
+def google_authenticated_for_user(user_id: str = "default_user") -> bool:
+    """Check if a specific user has connected their Google account."""
+    try:
+        from database.alloydb import get_google_token
+        return get_google_token(user_id) is not None
+    except Exception:
+        return False

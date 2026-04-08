@@ -14,6 +14,7 @@ class DriveAgent(BaseAgent):
     def handle(self, intent: dict, user_id: str) -> dict:
         action = intent.get("action")
         params = intent.get("params", {})
+        params["user_id"] = user_id
         tool = get_tool("google_drive")
 
         if not tool:

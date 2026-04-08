@@ -10,5 +10,7 @@ backend/.env
 backend/database/real_alloy_db.sqlite
 backend/token.json
 backend/credentials.json
+client_secret_*.json
+venv/
 .env
 *.log

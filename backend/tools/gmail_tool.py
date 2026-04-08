@@ -6,7 +6,8 @@ import base64
 import logging
 from email.mime.text import MIMEText
 from tools.mcp_tools import MCPTool
-from google_auth import get_service, is_google_authenticated
+from google_auth import get_service_for_user
+from database.alloydb import get_google_token
 
 logger = logging.getLogger(__name__)
 
@@ -22,28 +23,32 @@ class GmailTool(MCPTool):
     def description(self) -> str:
         return "Gmail - read inbox, search emails, and send messages."
 
-    def _get_service(self):
-        return get_service("gmail", "v1")
+    def _get_service(self, token_json: str):
+        return get_service_for_user("gmail", "v1", token_json)
 
     def execute(self, action: str, params: dict) -> dict:
-        if not is_google_authenticated():
-            return self._error("Google not authenticated. Run /api/auth/google first.")
+        user_id = params.get("user_id", "default_user")
+        token_row = get_google_token(user_id)
+        if not token_row:
+            return self._error("Google not authenticated. Sign in via the Google login button first.")
+
+        token_json = token_row["token_json"]
 
         try:
             if action == "read_inbox":
-                return self._read_inbox(params)
+                return self._read_inbox(token_json, params)
             elif action == "search":
-                return self._search_emails(params)
+                return self._search_emails(token_json, params)
             elif action == "send":
-                return self._send_email(params)
+                return self._send_email(token_json, params)
             else:
                 return self._error(f"Unknown action: {action}")
         except Exception as e:
             logger.exception("Gmail error")
             return self._error(str(e))
 
-    def _read_inbox(self, params: dict) -> dict:
-        service = self._get_service()
+    def _read_inbox(self, token_json: str, params: dict) -> dict:
+        service = self._get_service(token_json)
         max_results = params.get("max_results", 10)
 
         results = service.users().messages().list(
@@ -68,8 +73,8 @@ class GmailTool(MCPTool):
 
         return self._success(f"{len(email_list)} email(s) from inbox.", data={"emails": email_list})
 
-    def _search_emails(self, params: dict) -> dict:
-        service = self._get_service()
+    def _search_emails(self, token_json: str, params: dict) -> dict:
+        service = self._get_service(token_json)
         query = params.get("query", "")
         max_results = params.get("max_results", 10)
 
@@ -98,8 +103,8 @@ class GmailTool(MCPTool):
 
         return self._success(f"{len(email_list)} email(s) matching '{query}'.", data={"emails": email_list})
 
-    def _send_email(self, params: dict) -> dict:
-        service = self._get_service()
+    def _send_email(self, token_json: str, params: dict) -> dict:
+        service = self._get_service(token_json)
         to = params.get("to", "")
         subject = params.get("subject", "")
         body = params.get("body", "")
