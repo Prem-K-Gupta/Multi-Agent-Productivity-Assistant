@@ -1,36 +1,14 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# Git ignore rules for Nexus
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Python
-venv/
-__pycache__/
-*.pyc
-.pytest_cache/
-
-# Backend secrets
-backend/credentials.json
-backend/token.json
+node_modules/
+dist/
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+**/*.pyc
 backend/.env
-backend/database/*.sqlite
+backend/database/real_alloy_db.sqlite
+backend/token.json
+backend/credentials.json
+.env
+*.log

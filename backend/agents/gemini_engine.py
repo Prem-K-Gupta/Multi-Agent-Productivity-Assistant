@@ -73,7 +73,7 @@ def parse_intent(user_message: str) -> dict:
     try:
         client = _get_client()
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-pro",
             contents=INTENT_PROMPT + user_message,
             config={
                 "temperature": 0.1,
@@ -123,7 +123,7 @@ def generate_response(action: str, agent: str, data: dict, user_message: str) ->
             user_message=user_message,
         )
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-pro",
             contents=prompt,
             config={
                 "temperature": 0.7,
@@ -149,7 +149,7 @@ def chat_response(user_message: str, context: str = "") -> str:
         prompt += f"User: {user_message}\nNexus:"
 
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-pro",
             contents=prompt,
             config={
                 "temperature": 0.7,

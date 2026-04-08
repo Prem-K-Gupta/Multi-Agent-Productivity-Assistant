@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import os
@@ -14,6 +14,7 @@ from database.alloydb import (
     get_events, create_event, delete_event,
     get_notes, create_note, update_note, delete_note,
     get_memory, save_to_memory, delete_memory,
+    save_google_token, get_google_token, delete_google_token,
 )
 from tools.mcp_tools import check_mcp_health, list_tools, get_tool, google_tools_available
 
@@ -96,6 +97,13 @@ class MCPToolRequest(BaseModel):
 # =============== Initialize ===============
 orchestrator = OrchestratorAgent()
 
+# Public base URL — set BASE_URL env var in Cloud Run to your service URL
+BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:8000")
+
+
+def _get_redirect_uri():
+    return f"{BASE_URL}/api/auth/google/callback"
+
 
 # =============== Core Endpoints ===============
 
@@ -140,35 +148,85 @@ async def chat_endpoint(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# =============== Google Auth Endpoints ===============
+# =============== Google Auth Endpoints (Web Server Flow - works on Cloud Run) ===============
 
 @app.get("/api/auth/google/status")
-def google_auth_status():
-    """Check Google authentication status."""
+def google_auth_status(user_id: str = "default_user"):
+    """Check if this user has connected their Google account."""
     try:
-        from google_auth import is_google_configured, is_google_authenticated
+        from google_auth import is_google_configured
+        token_row = get_google_token(user_id)
         return {
             "credentials_configured": is_google_configured(),
-            "authenticated": is_google_authenticated(),
-            "tools_available": google_tools_available(),
+            "authenticated": token_row is not None,
+            "email": token_row["email"] if token_row else None,
+            "name": token_row["name"] if token_row else None,
+            "login_url": f"/api/auth/google/login?user_id={user_id}",
         }
     except Exception as e:
         return {"credentials_configured": False, "authenticated": False, "error": str(e)}
 
 
-@app.post("/api/auth/google")
-def google_auth_trigger():
-    """Trigger Google OAuth flow (opens browser for consent)."""
+@app.get("/api/auth/google/login")
+def google_login(user_id: str = "default_user"):
+    """
+    Step 1 — redirect the user's browser to Google's consent screen.
+    user_id is passed as OAuth 'state' so we know who to save the token for after.
+    """
     try:
-        from google_auth import get_credentials, is_google_configured
+        from google_auth import get_authorization_url, is_google_configured
         if not is_google_configured():
-            raise HTTPException(status_code=400, detail="credentials.json not found in backend/. Download from Google Cloud Console.")
-        get_credentials()
-        return {"status": "authenticated", "message": "Google OAuth completed successfully."}
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(
+                status_code=400,
+                detail="credentials.json not found. Download Web App OAuth2 credentials from Google Cloud Console and place in backend/."
+            )
+        auth_url = get_authorization_url(_get_redirect_uri(), state=user_id)
+        return RedirectResponse(url=auth_url)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/auth/google/callback")
+def google_callback(code: str = None, state: str = "default_user", error: str = None):
+    """
+    Step 2 — Google sends the user back here with an authorization code.
+    Exchange it for tokens, store them per-user in the database,
+    then redirect back to the frontend.
+    """
+    if error:
+        return RedirectResponse(url=f"{BASE_URL}/?auth_error={error}")
+    if not code:
+        return RedirectResponse(url=f"{BASE_URL}/?auth_error=no_code")
+
+    try:
+        from google_auth import exchange_code_for_tokens
+        user_id = state  # state = user_id we set in step 1
+
+        result = exchange_code_for_tokens(code, _get_redirect_uri())
+        save_google_token(
+            user_id=user_id,
+            email=result["email"],
+            name=result["name"],
+            token_json=result["token_json"],
+        )
+        logger.info(f"Google OAuth success: user={user_id} email={result['email']}")
+        return RedirectResponse(url=f"{BASE_URL}/?auth_success=true&email={result['email']}")
+
+    except Exception as e:
+        logger.exception("Google OAuth callback failed")
+        return RedirectResponse(url=f"{BASE_URL}/?auth_error=callback_failed")
+
+
+@app.delete("/api/auth/google/logout")
+def google_logout(user_id: str = "default_user"):
+    """Disconnect a user's Google account by removing their stored token."""
+    deleted = delete_google_token(user_id)
+    return {
+        "success": deleted,
+        "message": "Google account disconnected." if deleted else "No Google account was connected.",
+    }
 
 
 # =============== Task Endpoints ===============

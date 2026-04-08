@@ -83,6 +83,16 @@ def initialize_db():
                 completed_at DATETIME
             )
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS google_tokens (
+                user_id TEXT PRIMARY KEY,
+                email TEXT NOT NULL,
+                name TEXT DEFAULT '',
+                token_json TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
 
 # --------------- Memory Operations ---------------
@@ -283,6 +293,41 @@ def check_db_health() -> bool:
             return True
     except Exception:
         return False
+
+
+# --------------- Google Token Operations ---------------
+
+def save_google_token(user_id: str, email: str, name: str, token_json: str) -> dict:
+    """Upsert a user's Google OAuth token into the database."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO google_tokens (user_id, email, name, token_json, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                email=excluded.email,
+                name=excluded.name,
+                token_json=excluded.token_json,
+                updated_at=excluded.updated_at
+        """, (user_id, email, name, token_json, datetime.now().isoformat()))
+        return {"user_id": user_id, "email": email, "name": name}
+
+
+def get_google_token(user_id: str) -> dict | None:
+    """Retrieve a user's stored Google OAuth token."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM google_tokens WHERE user_id = ?", (user_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def delete_google_token(user_id: str) -> bool:
+    """Remove a user's Google token (sign out)."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM google_tokens WHERE user_id = ?", (user_id,))
+        return cursor.rowcount > 0
 
 
 # Initialize on import

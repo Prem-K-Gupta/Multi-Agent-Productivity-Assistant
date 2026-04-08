@@ -1,29 +1,29 @@
-# Stage 1: Build React frontend
-FROM node:20-slim AS frontend-build
+# ---- Build React frontend ----
+FROM node:18-slim AS frontend-builder
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package*.json ./
 RUN npm ci
-COPY src/ src/
-COPY public/ public/
-COPY index.html vite.config.js eslint.config.js ./
+COPY . .
 RUN npm run build
 
-# Stage 2: Python backend + static frontend
-FROM python:3.12-slim
-WORKDIR /app
+# ---- Build Python backend ----
+FROM python:3.12-slim AS final
 
-# Install Python dependencies
+WORKDIR /app/backend
+
+# Install dependencies
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend code
-COPY backend/ ./
+# Copy backend source
+COPY backend/ .
 
-# Copy built frontend into backend static directory
-COPY --from=frontend-build /app/dist ./static
+# Copy built React frontend into backend/static
+COPY --from=frontend-builder /app/dist ./static
 
-# Expose port (Cloud Run uses PORT env var)
+# Cloud Run sets PORT env var — default to 8080
+ENV PORT=8080
+
 EXPOSE 8080
 
-# Start server
 CMD ["python", "main.py"]
