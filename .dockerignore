@@ -1,0 +1,11 @@
+node_modules
+venv
+dist
+.git
+__pycache__
+*.pyc
+.pytest_cache
+.DS_Store
+backend/database/*.sqlite
+backend/token.json
+backend/.env
