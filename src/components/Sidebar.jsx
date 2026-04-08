@@ -80,7 +80,7 @@ const Sidebar = ({ open, onToggle, health }) => {
       <div className="sidebar-footer">
         <div className="footer-info">
           <span className="footer-label">Powered by</span>
-          <span className="footer-value">Gemini 2.0 Flash</span>
+          <span className="footer-value">Gemini 2.5 Pro</span>
         </div>
       </div>
     </aside>
