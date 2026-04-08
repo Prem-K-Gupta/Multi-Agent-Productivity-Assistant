@@ -14,6 +14,10 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
+# Allow scope changes — Google may grant fewer scopes than requested
+# (e.g. if APIs aren't enabled). oauthlib raises a Warning by default.
+os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
+
 logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

@@ -30,22 +30,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --port 8080 \
   --memory 512Mi \
   --set-env-vars "GEMINI_API_KEY=${GEMINI_API_KEY}" \
-  --set-env-vars "BASE_URL=PLACEHOLDER"
-
-# 3. Get the deployed URL
-SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" \
-  --region "$REGION" \
-  --format "value(status.url)")
-
-echo ""
-echo "✅ Deployed! Service URL: $SERVICE_URL"
-
-# 4. Set BASE_URL to the real Cloud Run URL
-echo ""
-echo "🔗 Setting BASE_URL to $SERVICE_URL ..."
-gcloud run services update "$SERVICE_NAME" \
-  --region "$REGION" \
-  --set-env-vars "BASE_URL=${SERVICE_URL},GEMINI_API_KEY=${GEMINI_API_KEY}"
+  --set-env-vars "BASE_URL=https://nexus-assistant-fmitunhgmq-uc.a.run.app"
 
 echo ""
 echo "🎉 DONE! Your app is live at: $SERVICE_URL"
