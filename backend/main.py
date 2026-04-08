@@ -109,6 +109,10 @@ def _get_redirect_uri():
 
 @app.get("/")
 def read_root():
+    # In production (static dir exists), serve the React frontend
+    static_index = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "index.html")
+    if os.path.isfile(static_index):
+        return FileResponse(static_index)
     return {
         "message": "Welcome to Nexus API",
         "version": "3.0.0",
