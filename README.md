@@ -2,12 +2,14 @@
 
 A multi-agent AI system that helps users manage tasks, schedules, and information by coordinating specialized sub-agents, Google services, and MCP tools.
 
+**Live Demo**: [https://nexus-assistant-fmitunhgmq-uc.a.run.app](https://nexus-assistant-fmitunhgmq-uc.a.run.app)
+
 ## Architecture
 
 ```
-User (Chat/API)
+User (Chat UI / REST API)
        |
-  Nexus Orchestrator (Gemini NLU)
+  Nexus Orchestrator (Gemini 2.5 Flash NLU + Regex Fallback)
        |
   +----+----+--------+--------+--------+--------+
   |         |        |        |        |        |
@@ -19,18 +21,19 @@ Agent    Agent    Agent    Agent   Agent    Agent
    MCP Tools                     Google APIs
   (Local DB)              (Calendar, Tasks, Gmail, Drive)
        |
-   SQLite / AlloyDB
+   SQLite DB (5 tables)
 ```
 
 ## Features
 
-- **Gemini-powered NLU** - Natural language understanding for intent classification
+- **Gemini-powered NLU** - Intent classification via Gemini 2.5 Flash with regex fallback
 - **6 specialized sub-agents** - Task, Calendar, Memory, Notes, Gmail, Drive
-- **7 MCP tools** - 3 local (SQLite) + 4 Google API integrations
-- **Multi-step workflows** - "Plan my day" chains multiple agents
-- **Full REST API** - 20+ endpoints for tasks, events, notes, memory, tools
-- **React frontend** - Glassmorphism chat UI with live status panel
-- **Cloud Run ready** - Dockerfile, deploy script included
+- **7 MCP tools** - 3 local (SQLite-backed) + 4 Google API integrations
+- **Per-user Google OAuth** - Web-based OAuth2 flow; each user connects their own Google account
+- **Multi-step workflows** - "Plan my day" and "Weekly review" chain multiple agents
+- **Full REST API** - 20+ endpoints for tasks, events, notes, memory, tools, and auth
+- **React frontend** - Chat UI with sidebar, status bar, Google sign-in, suggestion chips
+- **Cloud Run deployed** - Multi-stage Docker build, auto-deployed
 
 ## Quick Start
 
@@ -56,13 +59,18 @@ npm run dev                       # Starts on http://localhost:5173
 echo "GEMINI_API_KEY=your_key_here" > backend/.env
 ```
 
+Without a Gemini API key, the system falls back to regex-based intent parsing (still fully functional).
+
 ### Enable Google Services
 
 1. Create a project in [Google Cloud Console](https://console.cloud.google.com)
 2. Enable APIs: Calendar, Tasks, Gmail, Drive
-3. Create OAuth2 credentials (Desktop app)
-4. Download as `backend/credentials.json`
-5. Start backend - it will open browser for OAuth consent on first request
+3. Create **OAuth2 credentials** (Web Application type)
+4. Add authorized redirect URIs:
+   - `http://127.0.0.1:8000/api/auth/google/callback` (local dev)
+   - `https://YOUR_CLOUD_RUN_URL/api/auth/google/callback` (production)
+5. Download the credentials file as `backend/credentials.json`
+6. Sign in via the **Google Account** section in the sidebar
 
 ### Deploy to Cloud Run
 
@@ -70,10 +78,10 @@ echo "GEMINI_API_KEY=your_key_here" > backend/.env
 # Set your GCP project
 gcloud config set project YOUR_PROJECT_ID
 
-# Optional: set Gemini key
+# Set Gemini key
 export GEMINI_API_KEY=your_key
 
-# Deploy
+# Deploy (builds Docker image, deploys to Cloud Run, sets BASE_URL)
 ./deploy.sh
 ```
 
@@ -90,7 +98,10 @@ export GEMINI_API_KEY=your_key
 | GET | `/api/tools` | List MCP tools |
 | POST | `/api/tools/execute` | Execute MCP tool directly |
 | GET | `/api/agents` | List all agents |
-| GET/POST | `/api/auth/google/*` | Google OAuth status/trigger |
+| GET | `/api/auth/google/status` | Google OAuth status |
+| GET | `/api/auth/google/login` | Start Google sign-in flow |
+| GET | `/api/auth/google/callback` | OAuth callback handler |
+| DELETE | `/api/auth/google/logout` | Disconnect Google account |
 
 ## Chat Examples
 
@@ -115,9 +126,9 @@ help
 
 - **Backend**: FastAPI, Python 3.12, SQLite
 - **Frontend**: React 18, Vite
-- **AI**: Google Gemini 2.0 Flash
-- **Google APIs**: Calendar, Tasks, Gmail, Drive
-- **Deployment**: Docker, Google Cloud Run
+- **AI**: Google Gemini 2.5 Flash (intent parsing + response generation)
+- **Google APIs**: Calendar, Tasks, Gmail, Drive (per-user OAuth2)
+- **Deployment**: Docker (multi-stage), Google Cloud Run
 
 ## Testing
 
